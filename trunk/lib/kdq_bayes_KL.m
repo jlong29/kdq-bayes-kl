@@ -1,4 +1,4 @@
-function [KLs, null_stats] = kdq_bayes_KL(data,win,splitmin,stepsize,alpha,null,berr)
+function [KLs, null_stats] = kdq_bayes_KL_new(data,win,splitmin,stepsize,alpha,null,berr)
 % This code calculates the KL-divergence according to a range of available null
 % hypotheses, which may be specified by the user (see below). It employs the
 % kdq-tree to adaptively quantize the domain of ensemble states based upon the
@@ -257,7 +257,7 @@ switch lower(null)
 
     % evaluate null hypothesis of independence within each window. This detects
     % changes in ensemble correlations distinct from changes in ensemble firing
-    % rate. The kdq-tree is still constructed upon the whole dataset.
+    % rate. The kdq-tree is still constructed from the whole dataset.
     case {'ind', 'independent'}
         % KL-divergence vectors to be populated
         KLs    = zeros(size(data,1),1);
@@ -286,15 +286,15 @@ switch lower(null)
             
             % data for this window
             W1      = single(data(n:win+n-1,:));
-            W1_sh   = single(data_sh(n:win+n-1,:));
             
             if n == 1
                 % Generate independent samples by scrambling the time indices on
                 % a per unit basis
                 for q = 1:N
-                    ind1         = randsample(1:win,win);
+                    ind1            = randsample(1:win,win);
+                    ind2            = randsample(1:win,win);
                     indsamp(:,q)    = W1(ind1,q);
-                    indsamp_sh(:,q) = W1_sh(ind1,q);
+                    indsamp_sh(:,q) = W1(ind2,q);
                 end
                 % INITIAL overhead
                 nosp    = cell(N,1);
@@ -304,16 +304,14 @@ switch lower(null)
                 for q = 1:N
                     nosp{q}   = find(indsamp(:,q)==0);
                     nosp_sh{q}= find(indsamp_sh(:,q)==0);
-                    sp{q}  = find(indsamp(:,q)==1);
+                    sp{q}     = find(indsamp(:,q)==1);
                     sp_sh{q}  = find(indsamp_sh(:,q)==1);
                 end
             else
                 % just scramble incoming data while matching the firing rates of the
                 % original data
                 old_dp     = data(n-1,:);
-                old_dp_sh  = data_sh(n-1,:);
                 new_dp     = data(win+n-1,:);
-                new_dp_sh  = data_sh(win+n-1,:);
                 
                 for q = 1:N
                     % If new element and old element are the same for this channel, do
@@ -340,9 +338,9 @@ switch lower(null)
                             nosp{q} = [nosp{q};ind];
                         end
                     end
-                    if old_dp_sh(q)~=new_dp_sh(q)
+                    if old_dp(q)~=new_dp(q)
                         % If they are different
-                        if old_dp_sh(q) == 0
+                        if old_dp(q) == 0
                             % sample an index where a zero is found
                             ind = randsample(nosp_sh{q},1);
                             % delete this index from the list of zeros
@@ -364,26 +362,24 @@ switch lower(null)
                     end
                 end
             end
-                        
-            % Evaluate W2 relative to comp_t
+            
+            % Transform data relative to comp_t
             [W1_t]   = Bern_tree_update(comp_t, W1);
-            [W1_tsh] = Bern_tree_update(comp_t, W1_sh);
             [W2_i]   = Bern_tree_update(comp_t, indsamp);
-            [W2_ish] = Bern_tree_update(comp_t, indsamp_sh);
+            [W1_ish] = Bern_tree_update(comp_t, indsamp_sh);
             
             % Generate counts for each data
             n_1    = W1_t.nodesize(leafs);
-            n_1sh  = W1_tsh.nodesize(leafs);
             n_2i   = W2_i.nodesize(leafs);
-            n_2ish = W2_ish.nodesize(leafs);
+            n_1ish = W1_ish.nodesize(leafs);
             
             % Calculate KL-Divergence
             if isempty(berr)
                 KLs(n+win-1)    = bayes_est_KL_priors(n_1,n_2i,alpha);
-                KLs_sh(n+win-1) = bayes_est_KL_priors(n_1sh,n_2ish,alpha);
+                KLs_sh(n+win-1) = bayes_est_KL_priors(n_1ish,n_2i,alpha);
             else
                 [KLs(n+win-1),Q2,ci(n+win-1)] = bayes_est_KL_priors(n_1,n_2i,alpha);
-                KLs_sh(n+win-1)               = bayes_est_KL_priors(n_1sh,n_2ish,alpha);
+                KLs_sh(n+win-1)               = bayes_est_KL_priors(n_1ish,n_2i,alpha);
             end
         end
 
@@ -449,8 +445,9 @@ switch lower(null)
                 % a per unit basis
                 for q = 1:N
                     ind1            = randsample(1:win,win);
+                    ind2            = randsample(1:win,win);
                     indsamp(:,q)    = W2(ind1,q);
-                    indsamp_sh(:,q) = W2_sh(ind1,q);
+                    indsamp_sh(:,q) = W2(ind2,q);
                 end
                 % INITIAL overhead
                 nosp    = cell(N,1);
@@ -467,9 +464,7 @@ switch lower(null)
                 % just scramble incoming data while matching the firing rates of the
                 % original data
                 old_dp     = data(n-1,:);
-                old_dp_sh  = data_sh(n-1,:);
                 new_dp     = data(win+n-1,:);
-                new_dp_sh  = data_sh(win+n-1,:);
                 
                 for q = 1:N
                     % If new element and old element are the same for this channel, do
@@ -496,9 +491,9 @@ switch lower(null)
                             nosp{q} = [nosp{q};ind];
                         end
                     end
-                    if old_dp_sh(q)~=new_dp_sh(q)
+                    if old_dp(q)~=new_dp(q)
                         % If they are different
-                        if old_dp_sh(q) == 0
+                        if old_dp(q) == 0
                             % sample an index where a zero is found
                             ind = randsample(nosp_sh{q},1);
                             % delete this index from the list of zeros
@@ -542,13 +537,13 @@ switch lower(null)
             % Calculate KL-Divergence from surrogate independent sample
             if isempty(berr)
                 KLs_ind(n+win-1)    = bayes_est_KL_priors(n_2,n_2i,alpha);
-                KLs_ind_sh(n+win-1) = bayes_est_KL_priors(n_2sh,n_2ish,alpha);
+                KLs_ind_sh(n+win-1) = bayes_est_KL_priors(n_2i,n_2ish,alpha);
                 % Calculate KL-Divergence between adjacent samples
                 KLs_dkl(n+win-1) = bayes_est_KL_priors(n_1,n_2,alpha);
                 KLs_dkl_sh(n+win-1) = bayes_est_KL_priors(n_1sh,n_2sh,alpha);
             else
                 [KLs_ind(n+win-1),Q2,ci_ind(n+win-1)] = bayes_est_KL_priors(n_2,n_2i,alpha);
-                KLs_ind_sh(n+win-1) = bayes_est_KL_priors(n_2sh,n_2ish,alpha);
+                KLs_ind_sh(n+win-1) = bayes_est_KL_priors(n_2i,n_2ish,alpha);
                 % Calculate KL-Divergence between adjacent samples
                 [KLs_dkl(n+win-1),Q2,ci_dkl(n+win-1)] = bayes_est_KL_priors(n_1,n_2,alpha);
                 KLs_dkl_sh(n+win-1) = bayes_est_KL_priors(n_1sh,n_2sh,alpha);
