@@ -1,4 +1,4 @@
-function [KLs, null_stats] = kdq_bayes_KL_new(data,win,splitmin,stepsize,alpha,null,berr)
+function [KLs, null_stats] = kdq_bayes_KL(data,win,splitmin,stepsize,alpha,null,berr)
 % This code calculates the KL-divergence according to a range of available null
 % hypotheses, which may be specified by the user (see below). It employs the
 % kdq-tree to adaptively quantize the domain of ensemble states based upon the
